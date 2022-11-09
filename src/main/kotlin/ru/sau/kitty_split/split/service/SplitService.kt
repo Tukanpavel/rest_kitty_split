@@ -13,24 +13,40 @@ class SplitServiceStub : SplitService {
         val participants = inputData.participants
         val spendings = inputData.spendings
 
-        val debt: MutableMap<String, MutableList<BigDecimal>> = mutableMapOf()
+        val transactions = mutableMapOf<String, MutableMap<String, BigDecimal>>()
 
-        participants.forEach { participant ->
-            debt[participant] = spendings.asSequence().filter { spending ->
-                spending.payer == participant
-            }.map { spending -> spending.parts }.toList()[0].toMutableList()
-        }
+        val debtList = MutableList(participants.size) { BigDecimal(0) }
+        val creditList = MutableList(participants.size) { BigDecimal(0) }
+        val balanceList = MutableList(participants.size) { BigDecimal(0) }
 
         for (spending in spendings) {
-            participants.forEach { participant ->
-                for (i in 0..participants.size) {
-                    debt[participant]!![participants.indexOf(participant)] -= spending.parts[i]
-                }
+            creditList[participants.indexOf(spending.payer)] += sum(spending.parts)
+            for (i in spending.parts.indices) {
+                debtList[i] += spending.parts[i]
             }
         }
-        debt.filter { (participant, spending) -> !sum(spending).equals(0) }
 
-        val transactions = simpleTransactions(debt)
+        for (i in debtList.indices) {
+            balanceList[i] = creditList[i] - debtList[i]
+        }
+
+
+        while (true) {
+            val maxI = indexOfMax(balanceList)
+            val minI = indexOfMin(balanceList)
+            val currentMax = balanceList[maxI]
+            val currentMin = balanceList[minI]
+
+            if (currentMax == BigDecimal.ZERO) break
+
+            val min = minOf(currentMax, -currentMin)
+
+            writeTransaction(transactions, participants[minI], participants[maxI], min)
+
+            balanceList[maxI] -= min
+            balanceList[minI] += min
+
+        }
 
         return OutputData(transactions.keys.toList(), transactions)
     }
@@ -41,11 +57,33 @@ class SplitServiceStub : SplitService {
         return sum
     }
 
-    private fun simpleTransactions(debt: MutableMap<String, MutableList<BigDecimal>>): Map<String, Map<String, BigDecimal>> {
-        val myMap: Map<String, Map<String, BigDecimal>> = mutableMapOf()
-
-        val paymentList = debt.map{ (participant, values) ->  Pair(participant,sum(values)) }
-
-        return myMap
+    private fun indexOfMin(spendings: List<BigDecimal>): Int {
+        return spendings.indexOf(spendings.minOrNull())
     }
+
+    private fun indexOfMax(spendings: List<BigDecimal>): Int {
+        return spendings.indexOf(spendings.maxOrNull())
+    }
+
+    private fun writeTransaction(
+        transaction: MutableMap<String, MutableMap<String, BigDecimal>>,
+        payer: String,
+        payee: String,
+        amount: BigDecimal
+    ) {
+        if (transaction.containsKey(payer)) {
+            if (transaction[payer]!!.containsKey(payee))
+                transaction[payer]!![payee]!!.add(amount)
+            else transaction[payer]!![payee] = amount
+        } else transaction.put(
+            payer,
+            mutableMapOf(
+                Pair(
+                    payee,
+                    amount
+                )
+            )
+        )
+    }
+
 }
