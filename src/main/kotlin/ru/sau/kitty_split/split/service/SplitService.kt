@@ -30,7 +30,6 @@ class SplitServiceStub : SplitService {
             balanceList[i] = creditList[i] - debtList[i]
         }
 
-
         while (true) {
             val maxI = indexOfMax(balanceList)
             val minI = indexOfMin(balanceList)
@@ -72,15 +71,12 @@ class SplitServiceStub : SplitService {
         amount: BigDecimal
     ) {
         if (transaction.containsKey(payer)) {
-            if (transaction[payer]!!.containsKey(payee))
-                transaction[payer]!![payee]!!.add(amount)
+            if (transaction[payer]!!.containsKey(payee)) transaction[payer]!![payee]!!.add(amount)
             else transaction[payer]!![payee] = amount
         } else transaction.put(
-            payer,
-            mutableMapOf(
+            payer, mutableMapOf(
                 Pair(
-                    payee,
-                    amount
+                    payee, amount
                 )
             )
         )
